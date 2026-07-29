@@ -1,0 +1,39 @@
+{
+	"SearchRadiusMeters": 2000,
+	"MaxResults": 15,
+	"MatchThreshold": 0.35,
+	"IncludeTamed": false,
+	"MinLevel": 0,
+	"MaxLevel": 0,
+	"UpdateIntervalSeconds": 3,
+	"ArrivalRadiusMeters": 15,
+	"VerticalToleranceMeters": 8,
+	"ShowMapCoords": true,
+	"TrackingTimeoutSeconds": 600,
+	"RequireAdmin": false,
+	"Map": {
+		"LatOrigin": -342900.0,
+		"LonOrigin": -342900.0,
+		"LatScale": 8000.0,
+		"LonScale": 8000.0
+	},
+	"Messages": {
+		"Prefix": "[ArkFind] ",
+		"NoPermission": "You are not allowed to use this command.",
+		"Searching": "Searching for '{query}' within {radius}m...",
+		"NoResults": "Nothing matching '{query}' found within {radius}m.",
+		"ResultsHeader": "Found {count} match(es) for '{query}'. Use /findpick <n> to track one:",
+		"ResultsFooter": "Type /findpick <n> to start directions, /findstop to cancel.",
+		"NoSearchYet": "Run /finddino first, then /findpick <n>.",
+		"InvalidSelection": "'{argument}' is not a valid pick. Choose 1-{count}.",
+		"TrackingStarted": "Now tracking {name}. Walk and I will keep calling the turns.",
+		"TrackingStopped": "Stopped tracking.",
+		"NotTracking": "You are not tracking anything right now.",
+		"Arrived": "You made it - {name} is right here.",
+		"TargetLost": "Lost {name} (it died or moved out of range). Tracking stopped.",
+		"TrackingTimedOut": "Tracking of {name} timed out after {seconds}s. Tracking stopped.",
+		"HereLocation": "You are at lat {lat} lon {lon} (x {x} y {y} z {z}).",
+		"ConfigReloaded": "Configuration reloaded.",
+		"ConfigReloadFailed": "Could not reload configuration - see the server log."
+	}
+}

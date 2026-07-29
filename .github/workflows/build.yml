@@ -1,0 +1,80 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # The real gate. These are the pure-logic tests (Geo / NameMatch / Session):
+  # standard library only, no ARK SDK, so they must pass on every push and PR.
+  tests:
+    name: Unit tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DARKFIND_BUILD_TESTS=ON -DARKFIND_BUILD_PLUGIN=OFF
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        run: ctest --test-dir build --build-config Release --output-on-failure
+
+  # Best-effort compile of the actual server DLL.
+  #
+  # continue-on-error is intentional: this job depends on cloning the ServerAPI
+  # repository and guessing its public include layout, plus the MSVC import
+  # library that the real plugin links against. None of that is guaranteed to be
+  # fetchable or stable in CI - upstream can move directories or gate downloads
+  # at any time - so a red mark here is not a red mark on the code. A green
+  # "tests" job is the required gate; this job is a convenience artifact builder.
+  plugin-dll:
+    name: Plugin DLL (Windows, best effort)
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch ServerAPI SDK headers
+        run: git clone --depth 1 https://github.com/ServersHub/ServerAPI.git ${{ runner.temp }}/ServerAPI
+
+      - name: Locate SDK public include directory
+        id: sdk
+        shell: pwsh
+        run: |
+          $root = "${{ runner.temp }}/ServerAPI"
+          # Layout is not guaranteed; prefer a directory that actually holds the
+          # SDK headers, and fall back to the historical Core/Public path.
+          $candidate = Get-ChildItem -Path $root -Directory -Recurse -Filter 'Public' |
+            Where-Object { $_.FullName -like '*Core*' } |
+            Select-Object -First 1
+          if (-not $candidate) {
+            $candidate = Get-ChildItem -Path $root -Directory -Recurse -Filter 'Public' |
+              Select-Object -First 1
+          }
+          if (-not $candidate) {
+            throw "Could not find a 'Public' include directory under $root"
+          }
+          $dir = $candidate.FullName -replace '\\', '/'
+          Write-Host "Using ARKAPI_SDK_DIR=$dir"
+          "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Configure
+        run: cmake -B build -A x64 -DARKFIND_BUILD_PLUGIN=ON -DARKFIND_BUILD_TESTS=OFF "-DARKAPI_SDK_DIR=${{ steps.sdk.outputs.dir }}"
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Upload DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArkFind-dll
+          path: |
+            build/Release/ArkFind.dll
+            build/Release/ArkFind.pdb
+          if-no-files-found: warn

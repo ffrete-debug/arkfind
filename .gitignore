@@ -1,0 +1,64 @@
+# ---- Build output ----
+build/
+Build/
+out/
+Out/
+bin/
+obj/
+Debug/
+Release/
+x64/
+x86/
+
+# ---- CMake ----
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+CMakeUserPresets.json
+_deps/
+Makefile
+
+# ---- MSVC / Visual Studio ----
+.vs/
+*.sln.docstates
+*.vcxproj.user
+*.VC.db
+*.VC.opendb
+*.ipch
+ipch/
+enc_temp_folder/
+
+# ---- Compiler / linker artifacts ----
+*.dll
+*.pdb
+*.obj
+*.o
+*.lib
+*.exp
+*.ilk
+*.idb
+*.tlog
+*.exe
+*.a
+*.so
+*.dSYM/
+
+# ---- Local test binaries ----
+arkfind_tests
+arkfind_tests.exe
+
+# ---- Local secrets: never commit tokens or PATs ----
+*.token
+*.pat
+.env
+.env.local
+secrets.json
+
+# ---- Editor / OS noise ----
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
