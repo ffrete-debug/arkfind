@@ -1,11 +1,17 @@
 #include "Tracker.h"
 
 #include "Scanner.h"
+#include "Text.h"
 
 #include <vector>
 
 namespace ArkFind
 {
+	void Say(AShooterPlayerController* player, const std::string& text)
+	{
+		Sdk::SendChat(player, PluginState::Get().Cfg().Message("Prefix", "[ArkFind] ") + text);
+	}
+
 	PluginState& PluginState::Get()
 	{
 		static PluginState instance;
@@ -79,7 +85,8 @@ namespace ArkFind
 		TrackedTarget& target = session.Target;
 
 		DinoInfo current;
-		if (Sdk::FindDinoById(target.ActorId, current))
+		const bool visible = Sdk::FindDinoById(target.ActorId, current);
+		if (visible)
 		{
 			target.LastKnownLocation = current.Location;
 			target.DisplayName = current.DisplayName;
@@ -98,15 +105,11 @@ namespace ArkFind
 
 		if (HasArrived(target, playerLocation, options.ArrivalRadiusCm))
 		{
-			const std::string message = config_.Message("Arrived", "FOUND {name} - you are on top of it.");
-			std::string text = message;
-			const size_t slot = text.find("{name}");
-			if (slot != std::string::npos)
-			{
-				text.replace(slot, 6, target.DisplayName);
-			}
+			const std::string text = Text::Fill(
+				config_.Message("Arrived", "You made it - {name} is right here."),
+				{ {"name", target.DisplayName} });
 
-			Sdk::SendChat(player, text);
+			Say(player, text);
 			Sdk::SendNotification(player, text, 6.0f);
 
 			target.Active = false;
@@ -114,10 +117,24 @@ namespace ArkFind
 			return;
 		}
 
+		// Standing next to the last known spot with nothing resolvable there means
+		// the creature died or was destroyed, not that it streamed out. No point
+		// steering the player around for the rest of the timeout.
+		if (!visible && Geo::Distance3D(playerLocation, target.LastKnownLocation) <= options.ArrivalRadiusCm * 4.0)
+		{
+			Say(player, Text::Fill(
+				config_.Message("TargetLost", "Lost {name} (it died or moved out of range). Tracking stopped."),
+				{ {"name", target.DisplayName} }));
+			target.Active = false;
+			return;
+		}
+
+		// The dino unloaded and never came back before the timeout.
 		if (config_.TrackingTimeoutSeconds > 0 && target.TicksSinceSeen >= config_.TrackingTimeoutSeconds)
 		{
-			Sdk::SendChat(player, config_.Message("LostTarget",
-				"Lost track of " + target.DisplayName + " - it despawned or moved out of range. Run /finddino again."));
+			Say(player, Text::Fill(
+				config_.Message("TrackingTimedOut", "Tracking of {name} timed out after {seconds}s. Tracking stopped."),
+				{ {"name", target.DisplayName}, {"seconds", std::to_string(config_.TrackingTimeoutSeconds)} }));
 			target.Active = false;
 			return;
 		}

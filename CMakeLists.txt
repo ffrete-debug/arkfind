@@ -36,6 +36,7 @@ set(ARKFIND_PURE_SOURCES
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/Geo.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/NameMatch.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/Session.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/Text.cpp"
 )
 
 # ---------------------------------------------------------------------------

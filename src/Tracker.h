@@ -40,6 +40,9 @@ namespace ArkFind
 		int secondsSinceUpdate_ = 0;
 	};
 
+	// Sends one chat line to a player, prefixed with Messages.Prefix.
+	void Say(AShooterPlayerController* player, const std::string& text);
+
 	namespace Commands
 	{
 		void Register();

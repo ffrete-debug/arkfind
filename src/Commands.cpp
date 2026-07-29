@@ -1,10 +1,11 @@
 #include "Scanner.h"
+#include "Text.h"
 #include "Tracker.h"
 
 #include <API/ARK/Ark.h>
+#include <Logger/Logger.h>
 
 #include <string>
-#include <utility>
 #include <vector>
 
 namespace ArkFind
@@ -27,6 +28,11 @@ namespace ArkFind
 			// Everything after the command word, trimmed.
 			std::string Argument(const FString* message)
 			{
+				if (message == nullptr)
+				{
+					return "";
+				}
+
 				std::string raw = ToStd(*message);
 
 				const size_t space = raw.find(' ');
@@ -46,16 +52,20 @@ namespace ArkFind
 				return raw.substr(first, last - first + 1);
 			}
 
+			std::string RadiusText(const Config& cfg)
+			{
+				return Text::Number(cfg.SearchRadiusMeters, 0);
+			}
+
 			bool Allowed(AShooterPlayerController* player)
 			{
-				const PluginState& state = PluginState::Get();
-				if (!state.Cfg().RequireAdmin || Sdk::IsAdmin(player))
+				const Config& cfg = PluginState::Get().Cfg();
+				if (!cfg.RequireAdmin || Sdk::IsAdmin(player))
 				{
 					return true;
 				}
 
-				Sdk::SendChat(player, state.Cfg().Message("NoPermission",
-					"You do not have permission to use ArkFind."));
+				Say(player, cfg.Message("NoPermission", "You are not allowed to use this command."));
 				return false;
 			}
 
@@ -71,8 +81,9 @@ namespace ArkFind
 				target.TicksSinceSeen = 0;
 
 				const Config& cfg = PluginState::Get().Cfg();
-				Sdk::SendChat(player, cfg.Message("Tracking", "Tracking " + hit.Dino.DisplayName
-					+ " (lvl " + std::to_string(hit.Dino.Level) + "). Follow the arrow. /findstop to cancel."));
+				Say(player, Text::Fill(
+					cfg.Message("TrackingStarted", "Now tracking {name}. Walk and I will keep calling the turns."),
+					{ {"name", hit.Dino.DisplayName} }));
 
 				// Give an immediate first bearing instead of waiting for the tick.
 				Sdk::SendNotification(player,
@@ -90,41 +101,39 @@ namespace ArkFind
 
 				PluginState& state = PluginState::Get();
 				const Config& cfg = state.Cfg();
-				const uint64_t playerId = Sdk::GetPlayerId(player);
-				PlayerSession& session = state.SessionFor(playerId);
+				PlayerSession& session = state.SessionFor(Sdk::GetPlayerId(player));
 
 				const std::string query = Argument(message);
-				const Vec3 origin = Sdk::GetPlayerLocation(player);
+				const Text::Placeholders context = { {"query", query}, {"radius", RadiusText(cfg)} };
 
+				Say(player, Text::Fill(cfg.Message("Searching", "Searching for '{query}' within {radius}m..."), context));
+
+				const Vec3 origin = Sdk::GetPlayerLocation(player);
 				const SearchOptions options = cfg.ToSearchOptions();
-				const std::vector<DinoInfo> scanned = Sdk::ScanDinos(origin, options.RadiusCm);
 
 				session.LastQuery = query;
-				session.LastResults = RankResults(scanned, origin, query, options);
+				session.LastResults = RankResults(Sdk::ScanDinos(origin, options.RadiusCm), origin, query, options);
 
 				if (session.LastResults.empty())
 				{
-					Sdk::SendChat(player, cfg.Message("NoResults",
-						"Nothing matching \"" + query + "\" within "
-						+ std::to_string(static_cast<int>(cfg.SearchRadiusMeters)) + "m."));
+					Say(player, Text::Fill(
+						cfg.Message("NoResults", "Nothing matching '{query}' found within {radius}m."), context));
 					return;
 				}
 
-				// A single unambiguous hit needs no picking step.
-				if (session.LastResults.size() == 1 && !query.empty())
-				{
-					StartTracking(player, session, session.LastResults[0]);
-					return;
-				}
+				const std::string count = std::to_string(session.LastResults.size());
 
-				Sdk::SendChat(player, cfg.Message("ResultsHeader",
-					"Found " + std::to_string(session.LastResults.size())
-					+ " - pick one with /findpick <number>:"));
+				Say(player, Text::Fill(
+					cfg.Message("ResultsHeader", "Found {count} match(es) for '{query}'. Use /findpick <n> to track one:"),
+					{ {"count", count}, {"query", query}, {"radius", RadiusText(cfg)} }));
 
 				for (size_t i = 0; i < session.LastResults.size(); ++i)
 				{
-					Sdk::SendChat(player, FormatHitLine(static_cast<int>(i) + 1, session.LastResults[i]));
+					Say(player, FormatHitLine(static_cast<int>(i) + 1, session.LastResults[i]));
 				}
+
+				Say(player, cfg.Message("ResultsFooter",
+					"Type /findpick <n> to start directions, /findstop to cancel."));
 			}
 
 			void FindPick(AShooterPlayerController* player, FString* message, EChatSendMode::Type /*mode*/)
@@ -140,16 +149,17 @@ namespace ArkFind
 
 				if (session.LastResults.empty())
 				{
-					Sdk::SendChat(player, cfg.Message("NothingToPick",
-						"Run /finddino <name> first."));
+					Say(player, cfg.Message("NoSearchYet", "Run /finddino first, then /findpick <n>."));
 					return;
 				}
 
-				const int index = ParseSelection(Argument(message), session.LastResults.size());
+				const std::string argument = Argument(message);
+				const int index = ParseSelection(argument, session.LastResults.size());
 				if (index < 0)
 				{
-					Sdk::SendChat(player, cfg.Message("BadSelection",
-						"Pick a number between 1 and " + std::to_string(session.LastResults.size()) + "."));
+					Say(player, Text::Fill(
+						cfg.Message("InvalidSelection", "'{argument}' is not a valid pick. Choose 1-{count}."),
+						{ {"argument", argument}, {"count", std::to_string(session.LastResults.size())} }));
 					return;
 				}
 
@@ -164,13 +174,21 @@ namespace ArkFind
 				}
 
 				PluginState& state = PluginState::Get();
+				const Config& cfg = state.Cfg();
 				PlayerSession& session = state.SessionFor(Sdk::GetPlayerId(player));
-				session.Target = TrackedTarget{};
 
-				Sdk::SendChat(player, state.Cfg().Message("Stopped", "ArkFind tracking stopped."));
+				if (!session.Target.Active)
+				{
+					Say(player, cfg.Message("NotTracking", "You are not tracking anything right now."));
+					return;
+				}
+
+				session.Target = TrackedTarget{};
+				Say(player, cfg.Message("TrackingStopped", "Stopped tracking."));
 			}
 
-			// A quick census of what is around, so players know what to search for.
+			// Prints the player's own position, which is also how you calibrate the
+			// Map.* GPS values on a custom map.
 			void FindHere(AShooterPlayerController* player, FString* /*message*/, EChatSendMode::Type /*mode*/)
 			{
 				if (player == nullptr || !Allowed(player))
@@ -179,49 +197,18 @@ namespace ArkFind
 				}
 
 				const Config& cfg = PluginState::Get().Cfg();
-				const SearchOptions options = cfg.ToSearchOptions();
-				const Vec3 origin = Sdk::GetPlayerLocation(player);
+				const Vec3 location = Sdk::GetPlayerLocation(player);
+				const Geo::MapCoords coords = Geo::ToMapCoords(location, cfg.Map);
 
-				SearchOptions census = options;
-				census.MaxResults = 0;
-				const std::vector<SearchHit> hits = RankResults(Sdk::ScanDinos(origin, options.RadiusCm),
-					origin, "", census);
-
-				if (hits.empty())
-				{
-					Sdk::SendChat(player, cfg.Message("NoResults", "No creatures loaded near you."));
-					return;
-				}
-
-				// Species -> count, keeping the nearest example per species.
-				std::vector<std::pair<std::string, int>> species;
-				for (const SearchHit& hit : hits)
-				{
-					bool merged = false;
-					for (auto& entry : species)
+				Say(player, Text::Fill(
+					cfg.Message("HereLocation", "You are at lat {lat} lon {lon} (x {x} y {y} z {z})."),
 					{
-						if (entry.first == hit.Dino.DisplayName)
-						{
-							++entry.second;
-							merged = true;
-							break;
-						}
-					}
-					if (!merged)
-					{
-						species.emplace_back(hit.Dino.DisplayName, 1);
-					}
-				}
-
-				Sdk::SendChat(player, std::to_string(hits.size()) + " creatures, "
-					+ std::to_string(species.size()) + " species within "
-					+ std::to_string(static_cast<int>(cfg.SearchRadiusMeters)) + "m:");
-
-				const size_t limit = species.size() < 20 ? species.size() : 20;
-				for (size_t i = 0; i < limit; ++i)
-				{
-					Sdk::SendChat(player, "- " + species[i].first + " x" + std::to_string(species[i].second));
-				}
+						{"lat", Text::Number(coords.Lat, 1)},
+						{"lon", Text::Number(coords.Lon, 1)},
+						{"x", Text::Number(location.X, 0)},
+						{"y", Text::Number(location.Y, 0)},
+						{"z", Text::Number(location.Z, 0)},
+					}));
 			}
 
 			void FindCfg(AShooterPlayerController* player, FString* message, EChatSendMode::Type /*mode*/)
@@ -231,26 +218,29 @@ namespace ArkFind
 					return;
 				}
 
-				if (!Sdk::IsAdmin(player))
+				const Config& cfg = PluginState::Get().Cfg();
+				if (cfg.RequireAdmin && !Sdk::IsAdmin(player))
 				{
-					Sdk::SendChat(player, "Admins only.");
+					Say(player, cfg.Message("NoPermission", "You are not allowed to use this command."));
 					return;
 				}
 
 				if (Argument(message) != "reload")
 				{
-					Sdk::SendChat(player, "Usage: /findcfg reload");
+					Say(player, "Usage: /findcfg reload");
 					return;
 				}
 
 				std::string error;
 				if (PluginState::Get().ReloadConfig(error))
 				{
-					Sdk::SendChat(player, "ArkFind config reloaded.");
+					Say(player, PluginState::Get().Cfg().Message("ConfigReloaded", "Configuration reloaded."));
 				}
 				else
 				{
-					Sdk::SendChat(player, "ArkFind config reload failed: " + error);
+					Log::GetLog()->warn("ArkFind config reload failed: {}", error);
+					Say(player, cfg.Message("ConfigReloadFailed",
+						"Could not reload configuration - see the server log."));
 				}
 			}
 		}

@@ -178,18 +178,20 @@ so building `ArkFind.dll` requires:
 There is no Linux build of the DLL and there cannot be one — the plugin links against the Windows
 ARK server binary.
 
-**The pure-logic layer builds and runs anywhere.** `Geo`, `NameMatch` and `Session` deliberately
-depend on nothing but the standard library and the SDK-free `DinoInfo` struct, so the unit tests
-compile with a single g++ invocation on Linux, macOS or Windows:
+**The pure-logic layer builds and runs anywhere.** `Geo`, `NameMatch`, `Session` and `Text`
+deliberately depend on nothing but the standard library and the SDK-free `DinoInfo` struct, so the
+unit tests compile with a single g++ invocation on Linux, macOS or Windows:
 
 ```sh
-g++ -std=c++17 -Wall -Wextra -I src tests/*.cpp src/Geo.cpp src/NameMatch.cpp src/Session.cpp -o arkfind_tests && ./arkfind_tests
+g++ -std=c++17 -Wall -Wextra -I src -I tests tests/*.cpp \
+    src/Geo.cpp src/NameMatch.cpp src/Session.cpp src/Text.cpp -o arkfind_tests && ./arkfind_tests
 ```
 
-That covers distance and bearing math, the compass/turn/vertical hints, map-coordinate conversion,
-name normalisation, mod-tag and class-name parsing, fuzzy scoring, result ranking and filtering,
-line formatting, arrival detection and `/findpick` argument parsing. Only the actor scanning, the
-timer loop, config loading and chat plumbing need Windows.
+88 cases, currently all passing. They cover distance and bearing math, the compass/turn/vertical
+hints, map-coordinate conversion, name normalisation, mod-tag and class-name parsing, fuzzy scoring,
+result ranking and filtering, line formatting, arrival detection, `Messages.*` placeholder
+substitution and `/findpick` argument parsing. Only the actor scanning, the timer loop, config
+loading and chat plumbing need Windows.
 
 ## Limitations
 
