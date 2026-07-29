@@ -520,11 +520,11 @@ TEST_CASE(Session_FormatDirection_MapCoordsAppendedWhenEnabled)
 TEST_CASE(Session_FormatDirection_MapCoordsWithDefaultGpsSettings)
 {
 	DirectionOptions options = PlainOptions();
-	options.ShowMapCoords = true;   // default Gps: origin -342900, scale 8000
+	options.ShowMapCoords = true;   // default Gps: origin -342900, 6858 cm/unit
 
 	const TrackedTarget target = MakeTarget("Rex", At(0, -41200, 0));
 	CHECK_STR_EQ(ArkFind::FormatDirection(target, At(0, 0, 0), 0.0, options),
-		"^ Rex - 412m straight ahead (N) [lat 37.7 lon 42.9]");
+		"^ Rex - 412m straight ahead (N) [lat 44.0 lon 50.0]");
 }
 
 TEST_CASE(Session_FormatDirection_FoundBranchInsideArrivalRadius)
@@ -656,4 +656,121 @@ TEST_CASE(Session_ParseSelection_RejectsOutOfRange)
 	// More than four digits is refused outright, before any range check.
 	CHECK_EQ(ArkFind::ParseSelection("12345", 99999), -1);
 	CHECK_EQ(ArkFind::ParseSelection("9999", 99999), 9998);
+}
+
+// ------------------------------------------------- Ranking regression tests
+
+namespace
+{
+	DinoInfo NamedDinoAt(const std::string& displayName, double distanceCm, uint64_t actorId)
+	{
+		DinoInfo dino;
+		dino.DisplayName = displayName;
+		dino.ClassName = displayName;
+		dino.BlueprintPath = "/Game/PrimalEarth/Dinos/" + displayName + ".x_C";
+		dino.Location = At(distanceCm, 0.0, 0.0);
+		dino.Level = 100;
+		dino.IsAlive = true;
+		dino.ActorId = actorId;
+		return dino;
+	}
+}
+
+// Comparing scores with a tolerance made the sort comparator cyclic for these
+// three names: each adjacent pair is within the tolerance (so distance decided)
+// while the outer pair was not (so score decided). std::stable_sort with a
+// cyclic comparator is undefined behaviour, i.e. a live server crash.
+TEST_CASE(Session_RankResults_ComparatorStaysTransitive)
+{
+	const std::vector<DinoInfo> dinos = {
+		NamedDinoAt("Rexosaurus", 100.0, 1),
+		NamedDinoAt("Rex Alpha Ice", 200.0, 2),
+		NamedDinoAt("Rex Alpha Ice Wyvern", 300.0, 3),
+	};
+
+	ArkFind::SearchOptions options;
+	options.RadiusCm = 0.0;
+	options.MaxResults = 0;
+
+	const std::vector<ArkFind::SearchHit> hits = ArkFind::RankResults(dinos, At(0, 0, 0), "rex", options);
+	CHECK_EQ(hits.size(), static_cast<size_t>(3));
+
+	// Scores must be non-increasing, which a cyclic comparator cannot guarantee.
+	for (size_t i = 1; i < hits.size(); ++i)
+	{
+		CHECK(hits[i - 1].MatchScore >= hits[i].MatchScore - 1e-9);
+	}
+
+	// And the ordering must be antisymmetric and transitive over the same trio.
+	auto less = [](const ArkFind::SearchHit& a, const ArkFind::SearchHit& b)
+	{
+		const long ka = static_cast<long>(a.MatchScore / 0.01 + 0.5);
+		const long kb = static_cast<long>(b.MatchScore / 0.01 + 0.5);
+		if (ka != kb)
+		{
+			return ka > kb;
+		}
+		if (a.Dino.DistanceCm != b.Dino.DistanceCm)
+		{
+			return a.Dino.DistanceCm < b.Dino.DistanceCm;
+		}
+		return a.Dino.ActorId < b.Dino.ActorId;
+	};
+
+	for (const auto& a : hits)
+	{
+		for (const auto& b : hits)
+		{
+			CHECK(!(less(a, b) && less(b, a)));
+			for (const auto& c : hits)
+			{
+				if (less(a, b) && less(b, c))
+				{
+					CHECK(less(a, c));
+				}
+			}
+		}
+	}
+}
+
+// MatchThreshold 0.0 is documented as "most permissive", not "match everything".
+TEST_CASE(Session_RankResults_ZeroThresholdStillRejectsZeroScores)
+{
+	const std::vector<DinoInfo> dinos = {
+		NamedDinoAt("Dodo", 100.0, 1),
+		NamedDinoAt("Parasaur", 200.0, 2),
+		NamedDinoAt("Ankylo", 300.0, 3),
+	};
+
+	ArkFind::SearchOptions options;
+	options.RadiusCm = 0.0;
+	options.MaxResults = 0;
+	options.MatchThreshold = 0.0;
+
+	CHECK_EQ(ArkFind::RankResults(dinos, At(0, 0, 0), "xyzzy", options).size(), static_cast<size_t>(0));
+
+	// An empty query still means "everything nearby".
+	CHECK_EQ(ArkFind::RankResults(dinos, At(0, 0, 0), "", options).size(), static_cast<size_t>(3));
+}
+
+// The unit switch and the printed digits have to agree: 999.7m must not print
+// as "1000m" one tick before 1000m prints as "1.00km".
+TEST_CASE(Session_FormatHitLine_DistanceUnitMatchesPrintedDigits)
+{
+	auto hitAt = [](double distanceCm, uint64_t actorId)
+	{
+		ArkFind::SearchHit hit;
+		hit.Dino = NamedDinoAt("Rex", distanceCm, actorId);
+		hit.Dino.DistanceCm = distanceCm;
+		hit.MatchScore = 1.0;
+		return hit;
+	};
+
+	const ArkFind::SearchHit belowSwitch = hitAt(99940.0, 1);
+	const ArkFind::SearchHit atSwitch = hitAt(99970.0, 2);
+	const ArkFind::SearchHit aboveSwitch = hitAt(100000.0, 3);
+
+	CHECK(ArkFind::FormatHitLine(1, belowSwitch).find("999m") != std::string::npos);
+	CHECK(ArkFind::FormatHitLine(1, atSwitch).find("1.00km") != std::string::npos);
+	CHECK(ArkFind::FormatHitLine(1, aboveSwitch).find("1.00km") != std::string::npos);
 }

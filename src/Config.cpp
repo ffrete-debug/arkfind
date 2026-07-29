@@ -131,6 +131,26 @@ namespace ArkFind
 			out.ArrivalRadiusMeters = 15.0;
 		}
 
+		// A non-positive GPS scale would silently report lat 0 lon 0 for every
+		// creature, so fall back to the defaults instead of trusting it.
+		const Geo::MapGpsSettings defaults;
+		if (out.Map.LatScale <= 0.0)
+		{
+			out.Map.LatScale = defaults.LatScale;
+			error = "Map.LatScale must be positive; using the default";
+		}
+		if (out.Map.LonScale <= 0.0)
+		{
+			out.Map.LonScale = defaults.LonScale;
+			error = "Map.LonScale must be positive; using the default";
+		}
+
+		if (!error.empty())
+		{
+			// The config loaded, but the caller should log the correction.
+			return true;
+		}
+
 		error.clear();
 		return true;
 	}

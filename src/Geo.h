@@ -19,12 +19,17 @@ namespace ArkFind
 
 		// Origin/scale of the in-game GPS readout. Values differ per map, so they
 		// come from config rather than being baked in.
+		//
+		// ToMapCoords works out to (coord - origin) / scale, so `scale` is the
+		// number of world centimetres per GPS unit. The defaults are The Island's:
+		// 342900 / 6858 = 50.0, i.e. world origin sits at the centre of the map,
+		// which is what the in-game GPS shows.
 		struct MapGpsSettings
 		{
 			double LatOrigin = -342900.0;
 			double LonOrigin = -342900.0;
-			double LatScale = 8000.0;
-			double LonScale = 8000.0;
+			double LatScale = 6858.0;
+			double LonScale = 6858.0;
 		};
 
 		enum class VerticalHint

@@ -12,7 +12,7 @@ namespace ArkFind
 {
 	struct SearchOptions
 	{
-		double RadiusCm = 200000.0;   // 2000m
+		double RadiusCm = 200000.0;   // 2000m; 0 = no distance limit
 		int MaxResults = 15;
 		double MatchThreshold = 0.35;
 		bool IncludeTamed = false;
@@ -67,7 +67,7 @@ namespace ArkFind
 	};
 
 	// The live guidance line, e.g.
-	//   "^ Rex (lvl 145) - 412m straight ahead, above you [lat 41.2 lon 63.8]"
+	//   "^ Rex - 412m straight ahead (N), above you [lat 41.2 lon 63.8]"
 	std::string FormatDirection(const TrackedTarget& target,
 		const Vec3& playerLocation,
 		double playerYawDeg,

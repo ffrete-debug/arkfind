@@ -155,7 +155,9 @@ namespace ArkFind
 
 		bool Matches(const std::string& query, const std::string& candidate, double threshold)
 		{
-			return Score(query, candidate) >= threshold;
+			// A zero score is never a match, even with a threshold of 0.0.
+			const double score = Score(query, candidate);
+			return score > 0.0 && score >= threshold;
 		}
 
 		double BestScore(const std::string& query, const std::vector<std::string>& candidates)

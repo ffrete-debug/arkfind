@@ -113,6 +113,12 @@ if(ARKFIND_BUILD_PLUGIN)
 		"${CMAKE_CURRENT_SOURCE_DIR}/src/Plugin.cpp"
 	)
 
+	# The ARK server is a release binary. A plugin built against the debug CRT
+	# has a mismatched _ITERATOR_DEBUG_LEVEL and fails to load at runtime, so pin
+	# the release DLL runtime regardless of the configuration being built.
+	cmake_policy(SET CMP0091 NEW)
+	set_property(TARGET ArkFind PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+
 	target_include_directories(ArkFind PRIVATE
 		"${CMAKE_CURRENT_SOURCE_DIR}/src"
 		"${ARKAPI_SDK_DIR}"

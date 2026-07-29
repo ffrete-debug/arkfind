@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 
@@ -11,6 +12,10 @@ namespace ArkFind
 {
 	namespace
 	{
+		// Scores within one bucket of each other are treated as equally good, and
+		// distance decides. Quantizing keeps the sort comparator transitive.
+		constexpr double ScoreBucket = 0.01;
+
 		std::string FormatNumber(double value, int decimals)
 		{
 			char buffer[64];
@@ -21,7 +26,9 @@ namespace ArkFind
 		std::string FormatDistance(double distanceCm)
 		{
 			const double meters = Geo::CmToMeters(distanceCm);
-			if (meters < 1000.0)
+			// Compare against the rounded value, otherwise 999.7m prints as
+			// "1000m" while 1000.0m prints as "1.00km".
+			if (meters < 999.5)
 			{
 				return FormatNumber(meters, 0) + "m";
 			}
@@ -67,6 +74,8 @@ namespace ArkFind
 			double score = 1.0;
 			if (!matchAll)
 			{
+				// A zero score means "the query has nothing to do with this name",
+				// which stays a non-match even at MatchThreshold 0.0.
 				score = NameMatch::BestScore(query, {
 					dino.DisplayName,
 					dino.ClassName,
@@ -74,7 +83,7 @@ namespace ArkFind
 					dino.ModTag.empty() ? dino.DisplayName : (dino.ModTag + " " + dino.DisplayName)
 				});
 
-				if (score < options.MatchThreshold)
+				if (score <= 0.0 || score < options.MatchThreshold)
 				{
 					continue;
 				}
@@ -89,13 +98,25 @@ namespace ArkFind
 
 		// Best name match first, then closest. A player searching "rex" wants the
 		// nearest Rex, not the nearest Rexy-something.
+		//
+		// The score is quantized into buckets before comparing. Comparing raw
+		// scores with a tolerance ("close enough, so use distance") is not a
+		// strict weak ordering: three hits can chain A~B, B~C but A>C, which makes
+		// the comparator cyclic and std::stable_sort undefined.
 		std::stable_sort(hits.begin(), hits.end(), [](const SearchHit& a, const SearchHit& b)
 		{
-			if (std::fabs(a.MatchScore - b.MatchScore) > 0.01)
+			const long bucketA = std::lround(a.MatchScore / ScoreBucket);
+			const long bucketB = std::lround(b.MatchScore / ScoreBucket);
+			if (bucketA != bucketB)
 			{
-				return a.MatchScore > b.MatchScore;
+				return bucketA > bucketB;
 			}
-			return a.Dino.DistanceCm < b.Dino.DistanceCm;
+			if (a.Dino.DistanceCm != b.Dino.DistanceCm)
+			{
+				return a.Dino.DistanceCm < b.Dino.DistanceCm;
+			}
+			// Final tiebreak so the list order is stable across rescans.
+			return a.Dino.ActorId < b.Dino.ActorId;
 		});
 
 		if (options.MaxResults > 0 && hits.size() > static_cast<size_t>(options.MaxResults))

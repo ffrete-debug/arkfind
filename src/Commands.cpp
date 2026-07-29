@@ -234,6 +234,10 @@ namespace ArkFind
 				std::string error;
 				if (PluginState::Get().ReloadConfig(error))
 				{
+					if (!error.empty())
+					{
+						Log::GetLog()->warn("ArkFind config loaded with corrections: {}", error);
+					}
 					Say(player, PluginState::Get().Cfg().Message("ConfigReloaded", "Configuration reloaded."));
 				}
 				else

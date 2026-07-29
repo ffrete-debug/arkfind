@@ -28,6 +28,10 @@ namespace
 			// Defaults are usable, so a missing config is a warning, not a failure.
 			Log::GetLog()->warn("ArkFind config not loaded ({}); using defaults", error);
 		}
+		else if (!error.empty())
+		{
+			Log::GetLog()->warn("ArkFind config loaded with corrections: {}", error);
+		}
 
 		ArkFind::Commands::Register();
 		ArkApi::GetCommands()->AddOnTimerCallback(TimerId, &OnTimer);

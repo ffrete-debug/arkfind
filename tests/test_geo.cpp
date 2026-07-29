@@ -179,35 +179,71 @@ TEST_CASE(Geo_CardinalName_NormalizesInput)
 
 TEST_CASE(Geo_TurnHint_Bands)
 {
-	// |x| <= 12 -> straight ahead
+	// |x| <= 22.5 -> straight ahead
 	CHECK_STR_EQ(Geo::TurnHint(0.0), "straight ahead");
-	CHECK_STR_EQ(Geo::TurnHint(12.0), "straight ahead");
-	CHECK_STR_EQ(Geo::TurnHint(-12.0), "straight ahead");
+	CHECK_STR_EQ(Geo::TurnHint(22.5), "straight ahead");
+	CHECK_STR_EQ(Geo::TurnHint(-22.5), "straight ahead");
 
-	// 12 < |x| <= 45 -> slightly
-	CHECK_STR_EQ(Geo::TurnHint(12.1), "slightly right");
-	CHECK_STR_EQ(Geo::TurnHint(-12.1), "slightly left");
-	CHECK_STR_EQ(Geo::TurnHint(45.0), "slightly right");
-	CHECK_STR_EQ(Geo::TurnHint(-45.0), "slightly left");
+	// 22.5 < |x| <= 67.5 -> slightly
+	CHECK_STR_EQ(Geo::TurnHint(22.6), "slightly right");
+	CHECK_STR_EQ(Geo::TurnHint(-22.6), "slightly left");
+	CHECK_STR_EQ(Geo::TurnHint(67.5), "slightly right");
+	CHECK_STR_EQ(Geo::TurnHint(-67.5), "slightly left");
 
-	// 45 < |x| <= 100 -> to your side
-	CHECK_STR_EQ(Geo::TurnHint(45.1), "to your right");
-	CHECK_STR_EQ(Geo::TurnHint(-45.1), "to your left");
+	// 67.5 < |x| <= 112.5 -> to your side
+	CHECK_STR_EQ(Geo::TurnHint(67.6), "to your right");
+	CHECK_STR_EQ(Geo::TurnHint(-67.6), "to your left");
 	CHECK_STR_EQ(Geo::TurnHint(90.0), "to your right");
-	CHECK_STR_EQ(Geo::TurnHint(100.0), "to your right");
-	CHECK_STR_EQ(Geo::TurnHint(-100.0), "to your left");
+	CHECK_STR_EQ(Geo::TurnHint(112.5), "to your right");
+	CHECK_STR_EQ(Geo::TurnHint(-112.5), "to your left");
 
-	// 100 < |x| <= 155 -> hard
-	CHECK_STR_EQ(Geo::TurnHint(100.1), "hard right");
-	CHECK_STR_EQ(Geo::TurnHint(-100.1), "hard left");
-	CHECK_STR_EQ(Geo::TurnHint(155.0), "hard right");
-	CHECK_STR_EQ(Geo::TurnHint(-155.0), "hard left");
+	// 112.5 < |x| <= 157.5 -> hard
+	CHECK_STR_EQ(Geo::TurnHint(112.6), "hard right");
+	CHECK_STR_EQ(Geo::TurnHint(-112.6), "hard left");
+	CHECK_STR_EQ(Geo::TurnHint(157.5), "hard right");
+	CHECK_STR_EQ(Geo::TurnHint(-157.5), "hard left");
 
-	// |x| > 155 -> behind you (no left/right)
-	CHECK_STR_EQ(Geo::TurnHint(155.1), "behind you");
-	CHECK_STR_EQ(Geo::TurnHint(-155.1), "behind you");
+	// |x| > 157.5 -> behind you (no left/right)
+	CHECK_STR_EQ(Geo::TurnHint(157.6), "behind you");
+	CHECK_STR_EQ(Geo::TurnHint(-157.6), "behind you");
 	CHECK_STR_EQ(Geo::TurnHint(180.0), "behind you");
 	CHECK_STR_EQ(Geo::TurnHint(-180.0), "behind you");
+}
+
+// The words and the glyph must never disagree: they read the same bands.
+TEST_CASE(Geo_TurnHintAndArrow_AgreeOnEveryBand)
+{
+	for (double deg = -180.0; deg <= 180.0; deg += 0.5)
+	{
+		const std::string hint = Geo::TurnHint(deg);
+		const std::string arrow = Geo::TurnArrow(deg);
+
+		const bool ahead = hint == "straight ahead";
+		const bool behind = hint == "behind you";
+		const bool slight = hint == "slightly right" || hint == "slightly left";
+		const bool side = hint == "to your right" || hint == "to your left";
+
+		if (ahead)
+		{
+			CHECK_STR_EQ(arrow, "^");
+		}
+		else if (behind)
+		{
+			CHECK_STR_EQ(arrow, "v");
+		}
+		else if (slight)
+		{
+			CHECK(arrow == "/^" || arrow == "^\\");
+		}
+		else if (side)
+		{
+			CHECK(arrow == ">" || arrow == "<");
+		}
+		else
+		{
+			CHECK(arrow == "\\v" || arrow == "v/");
+		}
+	}
 }
 
 // --------------------------------------------------------------------- TurnArrow
@@ -283,17 +319,18 @@ TEST_CASE(Geo_VerticalName)
 
 TEST_CASE(Geo_ToMapCoords_DefaultSettings)
 {
-	// Defaults: origin -342900 cm, scale 8000 -> divide by 8000*100 cm, times 100.
+	// Defaults are The Island's: origin -342900 cm, 6858 cm per GPS unit, so the
+	// world origin is the middle of the map.
 	const Geo::MapGpsSettings settings;
 
 	const Geo::MapCoords atOrigin = Geo::ToMapCoords(At(0, 0, 0), settings);
-	CHECK_NEAR(atOrigin.Lat, 42.8625, 1e-9);
-	CHECK_NEAR(atOrigin.Lon, 42.8625, 1e-9);
+	CHECK_NEAR(atOrigin.Lat, 50.0, 1e-9);
+	CHECK_NEAR(atOrigin.Lon, 50.0, 1e-9);
 
 	// Lat comes from Y, Lon from X.
 	const Geo::MapCoords offset = Geo::ToMapCoords(At(0, -342900, 0), settings);
 	CHECK_NEAR(offset.Lat, 0.0, 1e-9);
-	CHECK_NEAR(offset.Lon, 42.8625, 1e-9);
+	CHECK_NEAR(offset.Lon, 50.0, 1e-9);
 
 	const Geo::MapCoords corner = Geo::ToMapCoords(At(-342900, -342900, 0), settings);
 	CHECK_NEAR(corner.Lat, 0.0, 1e-9);

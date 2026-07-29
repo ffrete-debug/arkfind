@@ -80,52 +80,69 @@ namespace ArkFind
 			return names[sector];
 		}
 
+		namespace
+		{
+			// The words and the arrow must agree, so both read the same bands: the
+			// eight 45 degree compass sectors, centred on straight ahead.
+			int TurnBand(double relativeBearingDeg)
+			{
+				const double magnitude = std::fabs(relativeBearingDeg);
+				if (magnitude <= 22.5)
+				{
+					return 0;
+				}
+				if (magnitude <= 67.5)
+				{
+					return 1;
+				}
+				if (magnitude <= 112.5)
+				{
+					return 2;
+				}
+				if (magnitude <= 157.5)
+				{
+					return 3;
+				}
+				return 4;
+			}
+		}
+
 		std::string TurnHint(double relativeBearingDeg)
 		{
-			const double magnitude = std::fabs(relativeBearingDeg);
 			const bool right = relativeBearingDeg >= 0.0;
 
-			if (magnitude <= 12.0)
+			switch (TurnBand(relativeBearingDeg))
 			{
+			case 0:
 				return "straight ahead";
-			}
-			if (magnitude <= 45.0)
-			{
+			case 1:
 				return right ? "slightly right" : "slightly left";
-			}
-			if (magnitude <= 100.0)
-			{
+			case 2:
 				return right ? "to your right" : "to your left";
-			}
-			if (magnitude <= 155.0)
-			{
+			case 3:
 				return right ? "hard right" : "hard left";
+			default:
+				return "behind you";
 			}
-			return "behind you";
 		}
 
 		std::string TurnArrow(double relativeBearingDeg)
 		{
-			const double magnitude = std::fabs(relativeBearingDeg);
 			const bool right = relativeBearingDeg >= 0.0;
 
-			if (magnitude <= 22.5)
+			switch (TurnBand(relativeBearingDeg))
 			{
+			case 0:
 				return "^";
-			}
-			if (magnitude <= 67.5)
-			{
+			case 1:
 				return right ? "/^" : "^\\";
-			}
-			if (magnitude <= 112.5)
-			{
+			case 2:
 				return right ? ">" : "<";
-			}
-			if (magnitude <= 157.5)
-			{
+			case 3:
 				return right ? "\\v" : "v/";
+			default:
+				return "v";
 			}
-			return "v";
 		}
 
 		VerticalHint Vertical(const Vec3& from, const Vec3& to, double toleranceCm)

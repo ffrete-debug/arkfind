@@ -42,8 +42,11 @@ namespace ArkFind
 		std::string Message(const std::string& id, const std::string& fallback) const;
 	};
 
-	// Loads config.json from the plugin directory. Returns false and leaves
-	// `out` at its defaults when the file is missing or malformed; `error` then
-	// describes what went wrong.
+	// Loads config.json from the plugin directory. Returns false and leaves `out`
+	// at its defaults when the file is missing or malformed.
+	//
+	// `error` is a diagnostic, not a status: it also comes back non-empty on
+	// success when a value had to be corrected (an unusable GPS scale, say), so
+	// callers should log it whenever it is set.
 	bool LoadConfig(const std::string& path, Config& out, std::string& error);
 }

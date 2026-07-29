@@ -231,8 +231,9 @@ TEST_CASE(NameMatch_Matches_ExplicitThreshold)
 	CHECK(NM::Matches("rex", "Rexy", 0.85));
 	CHECK(!NM::Matches("rex", "Trexosaurus", 0.70));
 	CHECK(NM::Matches("rex", "Trexosaurus", 0.55));
-	// A zero threshold still rejects nothing-in-common pairs only via the score.
-	CHECK(NM::Matches("zzz", "Rex", 0.0));
+	// A zero score is never a match, even with a threshold of 0.0 - otherwise
+	// MatchThreshold=0.0 would make every creature match every query.
+	CHECK(!NM::Matches("zzz", "Rex", 0.0));
 }
 
 // ----------------------------------------------------------------- BestScore

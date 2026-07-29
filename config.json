@@ -14,8 +14,8 @@
 	"Map": {
 		"LatOrigin": -342900.0,
 		"LonOrigin": -342900.0,
-		"LatScale": 8000.0,
-		"LonScale": 8000.0
+		"LatScale": 6858.0,
+		"LonScale": 6858.0
 	},
 	"Messages": {
 		"Prefix": "[ArkFind] ",
