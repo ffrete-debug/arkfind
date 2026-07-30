@@ -223,8 +223,9 @@ namespace ArkFind
 				return;
 			}
 
-			ArkApi::GetApiUtils().SendNotification(player, FColorList::Green, 1.2f, durationSeconds,
-				nullptr, *ToFString(text));
+			// SendNotification takes an FLinearColor, not an FColor.
+			ArkApi::GetApiUtils().SendNotification(player, FLinearColor(0.35f, 1.0f, 0.45f, 1.0f),
+				1.2f, durationSeconds, nullptr, *ToFString(text));
 		}
 
 		std::string PluginConfigPath()

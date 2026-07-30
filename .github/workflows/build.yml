@@ -6,8 +6,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  # The real gate. These are the pure-logic tests (Geo / NameMatch / Session):
-  # standard library only, no ARK SDK, so they must pass on every push and PR.
+  # The real gate. These are the pure-logic tests (Geo / NameMatch / Session /
+  # Text): standard library only, no ARK SDK, so they must pass on every push
+  # and PR.
   tests:
     name: Unit tests (Linux)
     runs-on: ubuntu-latest
@@ -24,48 +25,50 @@ jobs:
       - name: Test
         run: ctest --test-dir build --build-config Release --output-on-failure
 
-  # Best-effort compile of the actual server DLL.
+  # Compiles the actual server DLL against the ARK: Survival Evolved plugin SDK.
   #
-  # continue-on-error is intentional: this job depends on cloning the ServerAPI
-  # repository and guessing its public include layout, plus the MSVC import
-  # library that the real plugin links against. None of that is guaranteed to be
-  # fetchable or stable in CI - upstream can move directories or gate downloads
-  # at any time - so a red mark here is not a red mark on the code. A green
-  # "tests" job is the required gate; this job is a convenience artifact builder.
+  # The SDK is Michidu/ARK-Server-API: headers live in version/Core/Public and
+  # the import library is out_lib/ArkApi.lib. Both are committed to that repo, so
+  # a shallow clone is all this needs. (ServersHub/ServerAPI is the *Ascended*
+  # SDK - a different API - which is why this job does not use it.)
   plugin-dll:
-    name: Plugin DLL (Windows, best effort)
+    name: Plugin DLL (Windows)
     runs-on: windows-latest
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Fetch ServerAPI SDK headers
-        run: git clone --depth 1 https://github.com/ServersHub/ServerAPI.git ${{ runner.temp }}/ServerAPI
+      - name: Fetch the ARK Server API SDK
+        run: git clone --depth 1 https://github.com/Michidu/ARK-Server-API.git ${{ runner.temp }}/ArkServerApi
 
-      - name: Locate SDK public include directory
+      - name: Resolve SDK paths
         id: sdk
         shell: pwsh
         run: |
-          $root = "${{ runner.temp }}/ServerAPI"
-          # Layout is not guaranteed; prefer a directory that actually holds the
-          # SDK headers, and fall back to the historical Core/Public path.
-          $candidate = Get-ChildItem -Path $root -Directory -Recurse -Filter 'Public' |
-            Where-Object { $_.FullName -like '*Core*' } |
-            Select-Object -First 1
-          if (-not $candidate) {
-            $candidate = Get-ChildItem -Path $root -Directory -Recurse -Filter 'Public' |
-              Select-Object -First 1
+          $root = "${{ runner.temp }}/ArkServerApi"
+          $include = Join-Path $root 'version/Core/Public'
+          $lib = Join-Path $root 'out_lib/ArkApi.lib'
+
+          foreach ($path in @($include, $lib)) {
+            if (-not (Test-Path $path)) {
+              throw "Expected SDK path is missing: $path"
+            }
           }
-          if (-not $candidate) {
-            throw "Could not find a 'Public' include directory under $root"
-          }
-          $dir = $candidate.FullName -replace '\\', '/'
-          Write-Host "Using ARKAPI_SDK_DIR=$dir"
-          "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+          $include = $include -replace '\\', '/'
+          $lib = $lib -replace '\\', '/'
+          Write-Host "ARKAPI_SDK_DIR=$include"
+          Write-Host "ARKAPI_LIB=$lib"
+          "include=$include" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "lib=$lib" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Configure
-        run: cmake -B build -A x64 -DARKFIND_BUILD_PLUGIN=ON -DARKFIND_BUILD_TESTS=OFF "-DARKAPI_SDK_DIR=${{ steps.sdk.outputs.dir }}"
+        run: >
+          cmake -B build -A x64
+          -DARKFIND_BUILD_PLUGIN=ON
+          -DARKFIND_BUILD_TESTS=OFF
+          "-DARKAPI_SDK_DIR=${{ steps.sdk.outputs.include }}"
+          "-DARKAPI_LIB=${{ steps.sdk.outputs.lib }}"
 
       - name: Build
         run: cmake --build build --config Release
@@ -77,4 +80,4 @@ jobs:
           path: |
             build/Release/ArkFind.dll
             build/Release/ArkFind.pdb
-          if-no-files-found: warn
+          if-no-files-found: error

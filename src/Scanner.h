@@ -9,7 +9,9 @@
 // Everything in this file talks to the ARK SDK. It is the ONLY version sensitive
 // part of the plugin: if a future ServerAPI release renames a field accessor,
 // Scanner.cpp is the file to patch. Nothing else in the plugin includes Ark.h.
-class AShooterPlayerController;
+// The SDK declares its game types as structs, so this forward declaration has
+// to match or MSVC warns (C4099) on every translation unit that sees both.
+struct AShooterPlayerController;
 
 namespace ArkFind
 {

@@ -5,7 +5,8 @@
 #include "Config.h"
 #include "Session.h"
 
-class AShooterPlayerController;
+// Declared as a struct to match the SDK; see the note in Scanner.h.
+struct AShooterPlayerController;
 
 namespace ArkFind
 {

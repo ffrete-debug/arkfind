@@ -93,14 +93,28 @@ if(ARKFIND_BUILD_PLUGIN)
 		message(FATAL_ERROR
 			"ARKAPI_SDK_DIR is not set. Point it at the public include "
 			"directory of a ServerAPI checkout "
-			"(https://github.com/ServersHub/ServerAPI), for example:\n"
+			"(https://github.com/Michidu/ARK-Server-API), for example:\n"
 			"  cmake -B build -DARKFIND_BUILD_PLUGIN=ON "
-			"-DARKAPI_SDK_DIR=C:/ServerAPI/version/Core/Public")
+			"-DARKAPI_SDK_DIR=C:/ARK-Server-API/version/Core/Public "
+			"-DARKAPI_LIB=C:/ARK-Server-API/out_lib/ArkApi.lib")
 	endif()
 
 	if(NOT IS_DIRECTORY "${ARKAPI_SDK_DIR}")
 		message(FATAL_ERROR
 			"ARKAPI_SDK_DIR='${ARKAPI_SDK_DIR}' is not a directory.")
+	endif()
+
+	# ArkApi.lib exports the API entry points (GetApiUtils, GetCommands, ...).
+	# It sits in out_lib/ next to the SDK's include tree, so default to that and
+	# let the caller override.
+	get_filename_component(ARKAPI_SDK_ROOT "${ARKAPI_SDK_DIR}/../../.." ABSOLUTE)
+	set(ARKAPI_LIB "${ARKAPI_SDK_ROOT}/out_lib/ArkApi.lib" CACHE FILEPATH
+		"Path to ArkApi.lib from the ARK Server API SDK")
+
+	if(NOT EXISTS "${ARKAPI_LIB}")
+		message(FATAL_ERROR
+			"ARKAPI_LIB='${ARKAPI_LIB}' does not exist. Point it at out_lib/ArkApi.lib "
+			"in your ARK-Server-API checkout.")
 	endif()
 
 	# Explicit list, matching the files that make up the plugin.
@@ -119,11 +133,16 @@ if(ARKFIND_BUILD_PLUGIN)
 	cmake_policy(SET CMP0091 NEW)
 	set_property(TARGET ArkFind PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
 
+	# The bundled Unreal headers include each other by paths relative to API/UE
+	# (e.g. GenericPlatform/GenericPlatformStricmp.h does #include "CoreTypes.h"),
+	# so API/UE has to be on the include path in its own right.
 	target_include_directories(ArkFind PRIVATE
 		"${CMAKE_CURRENT_SOURCE_DIR}/src"
 		"${ARKAPI_SDK_DIR}"
+		"${ARKAPI_SDK_DIR}/API"
+		"${ARKAPI_SDK_DIR}/API/UE"
 	)
-	target_link_libraries(ArkFind PRIVATE arkfind_warnings)
+	target_link_libraries(ArkFind PRIVATE arkfind_warnings "${ARKAPI_LIB}")
 
 	set_target_properties(ArkFind PROPERTIES
 		OUTPUT_NAME "ArkFind"
