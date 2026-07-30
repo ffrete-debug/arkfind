@@ -18,6 +18,19 @@ namespace ArkFind
 				return ArkApi::Tools::Utf8Encode(std::wstring(*value));
 			}
 
+			// Tools::GetCurrentDir() returns spdlog::filename_t, which is narrow or
+			// wide depending on how spdlog was configured. Overloading covers both
+			// so this file does not have to guess.
+			std::string ToStd(const std::string& value)
+			{
+				return value;
+			}
+
+			std::string ToStd(const std::wstring& value)
+			{
+				return ArkApi::Tools::Utf8Encode(value);
+			}
+
 			FString ToFString(const std::string& value)
 			{
 				return FString(ArkApi::Tools::Utf8Decode(value).c_str());
@@ -234,8 +247,7 @@ namespace ArkFind
 
 		std::string PluginConfigPath()
 		{
-			return ArkApi::Tools::Utf8Encode(ArkApi::Tools::GetCurrentDir())
-				+ "/ArkApi/Plugins/ArkFind/config.json";
+			return ToStd(ArkApi::Tools::GetCurrentDir()) + "/ArkApi/Plugins/ArkFind/config.json";
 		}
 	}
 }
