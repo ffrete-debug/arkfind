@@ -15,7 +15,7 @@ namespace ArkFind
 		{
 			std::string ToStd(const FString& value)
 			{
-				return ArkApi::Tools::Utf8Encode(*value);
+				return ArkApi::Tools::Utf8Encode(std::wstring(*value));
 			}
 
 			FString ToFString(const std::string& value)
@@ -50,7 +50,7 @@ namespace ArkFind
 					return false;
 				}
 
-				UPrimitiveComponent* root = dino->RootComponentField();
+				USceneComponent* root = dino->RootComponentField();
 				if (root == nullptr)
 				{
 					return false;
@@ -61,7 +61,11 @@ namespace ArkFind
 				out.ActorId = DinoId(dino);
 				out.IsTamed = dino->TargetingTeamField() > TamedTeamThreshold;
 				out.IsFemale = dino->bIsFemale()();
-				out.Level = dino->GetCharacterLevel();
+				if (UPrimalCharacterStatusComponent* status = dino->MyCharacterStatusComponentField())
+				{
+					out.Level = static_cast<int>(status->BaseCharacterLevelField())
+						+ static_cast<int>(status->ExtraCharacterLevelField());
+				}
 
 				// The creature's own descriptive name is what makes mod dinos work
 				// without a hardcoded species table.
@@ -179,7 +183,7 @@ namespace ArkFind
 
 			// ARK yaw is 0 = +X = east and increases clockwise, while our bearings
 			// are 0 = north, so shift by 90 degrees.
-			const FRotator rotation = player->GetControlRotation();
+			const FRotator rotation = player->ControlRotationField();
 			return Geo::NormalizeDegrees(static_cast<double>(rotation.Yaw) + 90.0);
 		}
 
@@ -230,7 +234,8 @@ namespace ArkFind
 
 		std::string PluginConfigPath()
 		{
-			return ToStd(ArkApi::Tools::GetCurrentDir()) + "/ArkApi/Plugins/ArkFind/config.json";
+			return ArkApi::Tools::Utf8Encode(ArkApi::Tools::GetCurrentDir())
+				+ "/ArkApi/Plugins/ArkFind/config.json";
 		}
 	}
 }

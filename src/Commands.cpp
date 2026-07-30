@@ -22,7 +22,7 @@ namespace ArkFind
 
 			std::string ToStd(const FString& value)
 			{
-				return ArkApi::Tools::Utf8Encode(*value);
+				return ArkApi::Tools::Utf8Encode(std::wstring(*value));
 			}
 
 			// Everything after the command word, trimmed.
@@ -251,20 +251,20 @@ namespace ArkFind
 
 		void Register()
 		{
-			ArkApi::GetCommands()->AddChatCommand(CmdFind, &FindDino);
-			ArkApi::GetCommands()->AddChatCommand(CmdPick, &FindPick);
-			ArkApi::GetCommands()->AddChatCommand(CmdStop, &FindStop);
-			ArkApi::GetCommands()->AddChatCommand(CmdHere, &FindHere);
-			ArkApi::GetCommands()->AddChatCommand(CmdCfg, &FindCfg);
+			ArkApi::GetCommands().AddChatCommand(CmdFind, &FindDino);
+			ArkApi::GetCommands().AddChatCommand(CmdPick, &FindPick);
+			ArkApi::GetCommands().AddChatCommand(CmdStop, &FindStop);
+			ArkApi::GetCommands().AddChatCommand(CmdHere, &FindHere);
+			ArkApi::GetCommands().AddChatCommand(CmdCfg, &FindCfg);
 		}
 
 		void Unregister()
 		{
-			ArkApi::GetCommands()->RemoveChatCommand(CmdFind);
-			ArkApi::GetCommands()->RemoveChatCommand(CmdPick);
-			ArkApi::GetCommands()->RemoveChatCommand(CmdStop);
-			ArkApi::GetCommands()->RemoveChatCommand(CmdHere);
-			ArkApi::GetCommands()->RemoveChatCommand(CmdCfg);
+			ArkApi::GetCommands().RemoveChatCommand(CmdFind);
+			ArkApi::GetCommands().RemoveChatCommand(CmdPick);
+			ArkApi::GetCommands().RemoveChatCommand(CmdStop);
+			ArkApi::GetCommands().RemoveChatCommand(CmdHere);
+			ArkApi::GetCommands().RemoveChatCommand(CmdCfg);
 		}
 	}
 }

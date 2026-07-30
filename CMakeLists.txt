@@ -150,10 +150,14 @@ if(ARKFIND_BUILD_PLUGIN)
 	)
 
 	if(MSVC)
-		# The ARK server and the SDK are built with these; a plugin has to match.
+		# UNICODE/_UNICODE are not optional: the SDK's Unreal headers typedef TCHAR
+		# to wchar_t, and without them <windows.h> typedefs it to char, which is a
+		# hard redefinition error (C2371) in BasicTypes.h. It also keeps
+		# spdlog::filename_t wide, matching what Logger.h expects.
 		target_compile_definitions(ArkFind PRIVATE
+			UNICODE
+			_UNICODE
 			WIN32_LEAN_AND_MEAN
-			_CRT_SECURE_NO_WARNINGS
 		)
 		target_compile_options(ArkFind PRIVATE /EHsc /bigobj)
 	endif()

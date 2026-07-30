@@ -34,14 +34,14 @@ namespace
 		}
 
 		ArkFind::Commands::Register();
-		ArkApi::GetCommands()->AddOnTimerCallback(TimerId, &OnTimer);
+		ArkApi::GetCommands().AddOnTimerCallback(TimerId, &OnTimer);
 
 		Log::GetLog()->info("ArkFind loaded");
 	}
 
 	void Unload()
 	{
-		ArkApi::GetCommands()->RemoveOnTimerCallback(TimerId);
+		ArkApi::GetCommands().RemoveOnTimerCallback(TimerId);
 		ArkFind::Commands::Unregister();
 
 		Log::GetLog()->info("ArkFind unloaded");
